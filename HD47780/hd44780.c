@@ -2,8 +2,8 @@
 #include "hd44780.h"
 #include <stdarg.h>
 
-static char x;
-static char y;
+static char pos_x;
+static char pos_y;
 static volatile int LCD_Counter;
 
 void LCD_WriteText(char* text);
@@ -16,8 +16,7 @@ void LCD_SetCursor(unsigned char x, unsigned char y);
 int doubleToStr(int x, char *ptr);
 int intToStr(int x, char *ptr);
 int addString(char *text, char *ptr);
-void reset_position();
-void delay(int ms);
+static void delay(int ms);
 
 void LCD_Init(void) {
 
@@ -25,17 +24,15 @@ void LCD_Init(void) {
 	PORT->MODER |= PIN_D4_MODER | PIN_D5_MODER | PIN_D6_MODER | PIN_D7_MODER
 			| PIN_E_MODER | PIN_RS_MODER | PIN_RW_MODER;
 
-delay(20000000);
 	PORT->ODR &= ~PIN_E & ~PIN_RS & ~PIN_RW;
-
-	delay(20000000);
 	
-	LCD_WriteDPort(0x02); // 4 bit
-	delay(20000000);
-	LCD_WriteCommand(0x28); // ustawienie interfejsu 4bit, 2line, 5x8matrix
+	delay(20);
+	
+	LCD_WriteDPort(0x02); // 4bit interface
+	LCD_WriteCommand(0x28); // 4bit interface, 2line, 5x8 matrix
 	LCD_WriteCommand(0x0C); // display on, cursor off, blink off
 	LCD_WriteCommand(0x01);	// clear
-	reset_position();
+	LCD_SetCursor(0,0);
 }
 
 void LCD_printf(const char *format, ...) {
@@ -68,7 +65,7 @@ void LCD_printf(const char *format, ...) {
 	}
 	*ptr = 0;
 	LCD_WriteText(text);
-
+	free(text);
 	va_end(arg);
 }
 
@@ -79,11 +76,10 @@ void LCD_DecCounter() {
 
 void LCD_WriteText(char* text) {
 	LCD_WriteCommand(0x01);
-	reset_position();
-	LCD_SetCursor(0, 0);
+	LCD_SetCursor(0,0);
 	while (*text) {
 		if (*text == '\n') {
-			LCD_SetCursor(0, 1);
+			LCD_SetCursor(0, ++pos_y);
 			text++;
 		} else {
 			LCD_WriteChar(*text++);
@@ -103,7 +99,7 @@ void LCD_WriteCommand(unsigned char command) {
 }
 
 void LCD_WriteChar(unsigned char c) {
-	if (y >= HEIGHT)
+	if (pos_y >= HEIGHT)
 		return;
 
 	PORT->BSRR = PIN_RS;
@@ -116,12 +112,12 @@ void LCD_WriteChar(unsigned char c) {
 	while (LCD_ReadBusyFlag() & 0x80) {
 	}
 
-	x++;
+	pos_x++;
 
-	if (x == WIDTH) {
-		x = 0;
-		y++;
-		LCD_SetCursor(0, y);
+	if (pos_x == WIDTH) {
+		pos_x = 0;
+		pos_y++;
+		LCD_SetCursor(0, pos_y);
 	}
 }
 
@@ -182,6 +178,8 @@ unsigned char LCD_ReadDPort() {
 
 void LCD_SetCursor(unsigned char x, unsigned char y) {
 	int i;
+	pos_x = x;
+	pos_y = y;
 	LCD_WriteCommand(0x02);
 	for (i = 0; i < 40 * y; i++) {
 		LCD_WriteCommand(0x14);
@@ -242,19 +240,7 @@ int addString(char *text, char *ptr) {
 	return i;
 }
 
-void reset_position() {
-	x = 0;
-	y = 0;
-}
-
 void delay(int ms) {
-	int i,j,k,l;
-	for (i=0;i<200000000;i++) {
-		for (k=0;k<200000000;k++) {
-			for (l=0;l<200000000;l++) {
-				for (j=0;j<ms;j++) {
-				}
-			}
-		}
-	}
+	LCD_Counter = ms;
+	while (LCD_Counter); 
 }
