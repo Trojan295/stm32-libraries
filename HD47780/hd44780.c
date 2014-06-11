@@ -4,7 +4,6 @@
 
 static char pos_x;
 static char pos_y;
-static volatile int LCD_Counter;
 
 void LCD_WriteText(char* text);
 void LCD_WriteCommand(unsigned char command);
@@ -16,23 +15,24 @@ void LCD_SetCursor(unsigned char x, unsigned char y);
 int doubleToStr(int x, char *ptr);
 int intToStr(int x, char *ptr);
 int addString(char *text, char *ptr);
-static void delay(int ms);
 
 void LCD_Init(void) {
+
+	unsigned int i;
 
 	RCC->AHBENR |= PORT_CLK_ENABLE;
 	PORT->MODER |= PIN_D4_MODER | PIN_D5_MODER | PIN_D6_MODER | PIN_D7_MODER
 			| PIN_E_MODER | PIN_RS_MODER | PIN_RW_MODER;
 
 	PORT->ODR &= ~PIN_E & ~PIN_RS & ~PIN_RW;
-	
-	delay(20);
-	
+
+	for (i = 0; i < SystemCoreClock / 200; i++);
+
 	LCD_WriteDPort(0x02); // 4bit interface
 	LCD_WriteCommand(0x28); // 4bit interface, 2line, 5x8 matrix
 	LCD_WriteCommand(0x0C); // display on, cursor off, blink off
 	LCD_WriteCommand(0x01);	// clear
-	LCD_SetCursor(0,0);
+	LCD_SetCursor(0, 0);
 }
 
 void LCD_printf(const char *format, ...) {
@@ -65,18 +65,12 @@ void LCD_printf(const char *format, ...) {
 	}
 	*ptr = 0;
 	LCD_WriteText(text);
-	free(text);
 	va_end(arg);
-}
-
-void LCD_DecCounter() {
-	if (LCD_Counter > 0)
-		LCD_Counter--;
 }
 
 void LCD_WriteText(char* text) {
 	LCD_WriteCommand(0x01);
-	LCD_SetCursor(0,0);
+	LCD_SetCursor(0, 0);
 	while (*text) {
 		if (*text == '\n') {
 			LCD_SetCursor(0, ++pos_y);
@@ -238,9 +232,4 @@ int addString(char *text, char *ptr) {
 	}
 
 	return i;
-}
-
-void delay(int ms) {
-	LCD_Counter = ms;
-	while (LCD_Counter); 
 }
